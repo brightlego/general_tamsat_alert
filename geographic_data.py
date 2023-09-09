@@ -97,6 +97,7 @@ def get_ensembles(da: xr.DataArray,
                                           in_progress_bar=in_progress_bar):
         ensembles[look_back:, :, :, index] = da[start_time:start_time+ensemble_length, :, :].values
         weights[:, :, index] = weighting_function(start_time, 1)
+        
     ensembles[:,:,:,:] -= ensembles[look_back,:,:,:]
     ensembles[:,:,:,:] += da[ensemble_start,:,:]
     ensembles[:look_back, :, :, :] = da[ensemble_start-look_back:ensemble_start, :, :].values[:,:,:,np.newaxis]
@@ -113,6 +114,7 @@ def get_mean_data(da: xr.DataArray,
 
     mean = parray.mean(dim="ensemble")
     bias = mean - da.sel(ensemble=0)
+    abs_bias = mean - da.sel(ensemble=0)
     rel_bias = bias/da.sel(ensemble=0)
     return mean, bias, rel_bias
 
@@ -226,7 +228,7 @@ def get_ensemble_indices(da: xr.DataArray, prediction_date: str, start_dates: Li
     if np.sum(da[time_label].isin(np.array(start_dates, dtype=np.datetime64))) < len(start_dates):
         print("Warning: not all prediction times are in the dataset. Using nearest neighbours.")
     if np.datetime64(prediction_date) not in da[time_label]:
-        print(f"Warning: prediction date is not in the dataset. Using nearest neighbour {da[end_index]}.")
+        print(f"Warning: prediction date is not in the dataset. Using nearest neighbour.")
     return start_indices, ensemble_lengths, end_index
 
 def plot_predictions(da: xr.DataArray, prediction_date: str, start_dates: List[str], period: int,
@@ -241,6 +243,9 @@ def plot_predictions(da: xr.DataArray, prediction_date: str, start_dates: List[s
     bias_data = xr.DataArray(np.empty((len(da[lat_label]), len(da[lon_label]), len(start_dates))),
                              [da[lat_label], da[lon_label], da[time_label][start_indices]],
                              [lat_label, lon_label, "start date"])
+    abs_bias_data = xr.DataArray(np.empty((len(da[lat_label]), len(da[lon_label]), len(start_dates))),
+                             [da[lat_label], da[lon_label], da[time_label][start_indices]],
+                             [lat_label, lon_label, "start date"])
     climate_mean = da[end_index%period::period, :, :].mean(time_label).values[:,:,np.newaxis]
     for i,_ in progress_bar(start_dates, "Getting ensembles", lambda _1,_2,val: val):
         ensembles, weights = get_ensembles(da, period, ensemble_lengths[i], start_indices[i], 0, wf(start_indices[i], da), True,
@@ -248,8 +253,10 @@ def plot_predictions(da: xr.DataArray, prediction_date: str, start_dates: List[s
         mean, bias, _ = get_mean_data(ensembles[-1, :, :, :], weights)
         mean_data[:,:,i] = mean.values
         bias_data[:,:,i] = bias.values
+    
+    abs_bias_data = np.abs(bias_data)
     proj_args = dict(projection=ccrs.PlateCarree())
-    mean_data.plot.imshow(x=lon_label, y=lat_label, col="start date", robust=mean_robust, transform=ccrs.PlateCarree(), subplot_kws=proj_args, vmin=0, cmap='cividis', **mean_kwargs)
+    mean_data.plot.imshow(x=lon_label, y=lat_label, col="start date", robust=mean_robust, transform=ccrs.PlateCarree(), subplot_kws=proj_args, vmin=0, cmap='YlGn', **mean_kwargs)
     plt.suptitle(f"Mean {data_label} for {da[time_label][end_index].values}", y=1)
     for ax in plt.gcf().axes[:-1]:
         ax.coastlines()
@@ -271,11 +278,12 @@ def plot_predictions(da: xr.DataArray, prediction_date: str, start_dates: List[s
         ax.coastlines()
         ax.add_feature(BORDERS)
 
-    bias_data.plot.imshow(x=lon_label, y=lat_label, col="start date", robust=bias_robust, cmap="BrBG", transform=ccrs.PlateCarree(), subplot_kws=proj_args, **bias_kwargs)
+    abs_bias_data.plot.imshow(x=lon_label, y=lat_label, col="start date", robust=bias_robust, cmap="Reds", transform=ccrs.PlateCarree(), subplot_kws=proj_args, **bias_kwargs)
     plt.suptitle(f"Anomaly {data_label} from observed for {da[time_label][end_index].values}", y=1)
     for ax in plt.gcf().axes[:-1]:
         ax.coastlines()
         ax.add_feature(BORDERS)
+    return mean_data, abs_bias_data, climate_mean
 
 
 def get_hindcasts_observed(da: xr.DataArray, ensemble_lengths: List[int], start_indices: List[int], period: int,
@@ -326,6 +334,8 @@ def plot_ppmcc(da: xr.DataArray, prediction_date: str, start_dates: List[str], p
         rmse[:,:,i] = ((hindcasts[i] - observed[i]) ** 2).mean(dim="hindcast")**0.5
     (ppmcc**2).plot.imshow(x=lon_label,y=lat_label,col="start dates", vmin=0, vmax=1, cmap="viridis")
     rmse.plot.imshow(x=lon_label,y=lat_label,col="start dates", robust=True, cmap="viridis")
+    
+    return ppmcc, rmse
 
 
 def get_roc_auc(da: xr.DataArray, prediction_date: str, start_dates: List[str], period: int, threshold_value: float = 0.2,
@@ -346,6 +356,7 @@ def get_roc_auc(da: xr.DataArray, prediction_date: str, start_dates: List[str], 
     climate_mean = da[end_index % period :: period, :, :].mean(dim=time_label)
     climate_std = da[end_index % period :: period, :, :].std(dim=time_label)
     threshold = norm.ppf(threshold_value) * climate_std + climate_mean
+    mean_roc=[]
     for i, start_index in progress_bar(start_indices, "Calculating ROC AUC"):
         events = xr.DataArray(
             np.array(observed[i] < threshold, dtype=bool), means[i].coords
@@ -357,13 +368,17 @@ def get_roc_auc(da: xr.DataArray, prediction_date: str, start_dates: List[str], 
         roc_auc[:, :, i] = fastroc.calc_roc_auc(
             events.values, percentiles.values, thread_count=16, integral_precision=integration_steps
         )
-    return roc_auc
+        mean_roc.append(np.nanmean(roc_auc[:,:,i]))
+    return roc_auc, mean_roc
 
 def plot_roc_auc(da: xr.DataArray, prediction_date: str, start_dates: List[str], period: int, threshold_value: float = 0.2,
                  wf: Callable[[int, xr.DataArray], Callable[[int, float], int]] = lambda _1, _2: weighting_functions.no_weights,
                  lat_label: Hashable = 'lat', lon_label: Hashable = 'lon', time_label: Hashable = 'time'):
-    roc_auc = get_roc_auc(da, prediction_date, start_dates, period, threshold_value, wf, 50, lat_label, lon_label, time_label)
-    roc_auc.plot(x=lon_label,y=lat_label,col="start dates", cmap="plasma", vmin=0.5)
+    roc_auc,mean_roc = get_roc_auc(da, prediction_date, start_dates, period, threshold_value, wf, 50, lat_label, lon_label, time_label)
+    print(mean_roc)
+    #roc_auc.plot(x=lon_label,y=lat_label,col="start dates", cmap="plasma", vmin=0.5)
+    roc_auc.plot(x=lon_label,y=lat_label,col="start dates", cmap="Purples", vmin=0.5)
+    return roc_auc
 
 
 def read_noaa_data_file(fname: str, time_axis: xr.DataArray = None, time_label: str = 'time', replace_given_nan_value=True):
