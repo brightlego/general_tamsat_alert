@@ -78,7 +78,7 @@ def validate_weighting(data, period, start_time, predict_time, weighting_strengt
     for strength in weighting_strength:
         weighting_function = no_weights
         if weighting_function_type == 'nearby_time':
-            weighting_function = nearby_time(start_time, strength)
+            weighting_function = weight_time_builder(start_time, strength)
         ensembles, weights = get_ensembles(data, period, start_time%period, predict_time, weighting_function)
         errors = []
         correls = []
@@ -114,7 +114,7 @@ def validate(data, period, start_offsets, offset_period, predict_time, weighting
         for year in range(offset, len(data)-predict_time, offset_period):
             weighting_function = no_weights
             if weighting_function_type == 'nearby_time':
-                weighting_function = nearby_time(year, 10)
+                weighting_function = weight_time_builder(year, 10)
             true_data = data[year: year + predict_time]
             ensembles, weights = get_ensembles(data, period, offset, predict_time, weighting_function)
             # ensemble_mean = np.average([np.mean(e+true_data[0]) for e in ensembles], weights=weights)
