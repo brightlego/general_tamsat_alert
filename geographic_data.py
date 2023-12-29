@@ -875,7 +875,7 @@ def process_data(
     print(weighting_data)
 
     print(f"Period of {period} timesteps")
-    """
+
     get_weighting_roc_improvement(
         ds[field],
         "2012-07-31",
@@ -904,7 +904,7 @@ def process_data(
         ["2012-04-30", "2012-05-31", "2012-06-30", "2012-07-16", "2012-07-31"],
         period,
     )
-    """
+
     plot_roc_auc(
         ds[field][:, :, :],
         "2012-07-31",

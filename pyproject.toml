@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "general_tamsat_alert"
-version = "0.0.1-a2"
+version = "0.0.3"
 dependencies = [
     "numpy",
     "xarray",

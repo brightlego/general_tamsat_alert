@@ -3,7 +3,6 @@ pyproject.toml
 src/general_tamsat_alert/__init__.py
 src/general_tamsat_alert/ensembles.py
 src/general_tamsat_alert/periodicity.py
-src/general_tamsat_alert/plot.py
 src/general_tamsat_alert/roc_auc.py
 src/general_tamsat_alert/weighting_functions.py
 src/general_tamsat_alert.egg-info/PKG-INFO

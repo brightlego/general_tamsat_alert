@@ -1,5 +1,4 @@
 numpy
 xarray
 scipy
-matplotlib
 fastroc

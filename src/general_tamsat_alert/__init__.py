@@ -1,2 +1,2 @@
 from general_tamsat_alert.periodicity import get_periodicity
-from general_tamsat_alert.ensembles import get_ensembles, get_ensemble_indices, get_hindcasts_observed
+from general_tamsat_alert.ensembles import get_ensembles, get_ensemble_indices, get_hindcasts_observed, get_mean_data
