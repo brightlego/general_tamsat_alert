@@ -1,9 +1,7 @@
 import pandas as pd
-import numpy as np
 import scipy.fft as fft
 from scipy.stats import linregress
 import matplotlib.pyplot as plt
-import matplotlib.colors as colors
 from weighting_functions import *
 import scipy.stats as stats
 
@@ -154,7 +152,7 @@ def get_ensembles(past_data, period, start_time, predict_time, weighting_functio
 
 
 def process_temp_data():
-    data = get_data('formated_stats.csv')
+    data = get_data('example/data/formated_stats.csv')
     plt.plot(data['Date'], data['Data'])
     period = get_periodicity(data['Data'])
     print(f'Data has a period of {period}')
@@ -184,7 +182,7 @@ def process_temp_data():
 
 
 def process_other_data(predict_time=12, field='Precip'):
-    data = get_data2('metrics_601.csv')
+    data = get_data2('example/data/metrics_601.csv')
     plt.plot(data['Time'], data[field])
     period = get_periodicity(data[field])
     period = round(period)

@@ -7,7 +7,6 @@ import cartopy.crs as ccrs
 from cartopy.feature import BORDERS
 from typing import List, Tuple, Iterable, Hashable, Sequence, Union
 
-from progress_bar import progress_bar
 import main
 import weighting_functions as wfs
 import fastroc
@@ -15,22 +14,38 @@ import fastroc
 AxisLabelType = Union[str, Iterable[Hashable]]
 
 
-def get_non_nan_coords(
+def get_non_nan_indices(
     ds: xr.Dataset,
     field: Hashable,
-    lon_label: Hashable = "lon",
-    lat_label: Hashable = "lat",
+    lon_label: AxisLabelType = "lon",
+    lat_label: AxisLabelType = "lat",
     step: int = 10,
 ) -> List[Tuple[int, int]]:
+    """Gets all the indices in `ds[field]`, sampling every `step` in x
+    and y that have no NaN values in all the other (usually only time)
+    Axes.
+
+    :param ds: The dataset of the data to check for NaNs
+    :param field: The field to check for NaNs in
+    :param lon_label: The label of the longitude axis of the dataset
+    :param lat_label: The label of the latitude axis of the dataset
+    :param step: The step to use to sample the grid
+    :return: A list of lat, lon indices that contain no NaN values
+    """
     out = []
     # Exclude the boundaries as they may contain wierd points, and it
     # is safer to just ignore them
-    for lat, lon in itertools.product(
-        range(1, ds.dims[lat_label] - 1, step), range(1, ds.dims[lon_label] - 1, step)
-    ):
+    for lat, lon in itertools.product( # Gets all the sample co-ordinates
+            range(1, ds.dims[lat_label] - 1, step),
+            range(1, ds.dims[lon_label] - 1, step)):
+        # Turn the data into a numpy array so that nansum is *not* used
         data = np.array(ds.isel(lat=lat, lon=lon)[field])
+
+        # Check if there are any nans as nans propagate
         if not np.isnan(np.sum(data)):
             out.append((lat, lon))
+
+    # If no nans are found, raise an error
     if len(out) == 0:
         raise ValueError(f"All points have NaNs at some time in field {field}")
     return out
@@ -40,19 +55,45 @@ def get_periodicity(
     ds: xr.Dataset,
     field: Hashable,
     point: Tuple[int, int] = None,
-    lon_label: Hashable = "lon",
-    lat_label: Hashable = "lat",
+    lon_label: AxisLabelType = "lon",
+    lat_label: AxisLabelType = "lat",
     step: int = 10,
 ) -> int:
+    """Gets the periodicity in indices of the data in `ds[field]`.
+
+    Uses some preprocessing + a fourier transform on every `step`th
+    lon/lat in the dataset to get the most significant peak in each
+    sample and then return the modal sample. Also plots a histogram
+    of the sample data.
+
+    If only a singular point is needed to be checked, set `point` to
+    a tuple pair of integers.
+
+    :param ds: The dataset to find the periodicity with
+    :param field: The field to find the periodicity across
+    :param point: (Optional) The point to use if you are impatient
+    :param lon_label: The label for the longitude axis
+    :param lat_label: The label for the latitude axis
+    :param step: The lon/lat step to use in sampling
+    :return: The periodicity in indices
+    """
     if point is None:
-        search_co_ordinates = get_non_nan_coords(ds, field, lon_label, lat_label, step)
+        try:
+            search_co_ordinates = get_non_nan_indices(ds, field, lon_label, lat_label, step)
+        except ValueError:
+            m = input(
+                "No periodicity found. \nPlease enter a periodicity in "
+                "time steps (e.g. 12 for an annual period for monthly data): "
+            )
+            while True:
+                try:
+                    m = int(m)
+                except ValueError:
+                    m = input(f"{m} is not a valid integer. Please input again: ")
+                else:
+                    return m
         out = []
-        for i, (lat, lon) in progress_bar(
-            search_co_ordinates,
-            "Finding Periodicity",
-            lambda _1, _2, coords: f"({ds.coords[lat_label].isel({lat_label: coords[0]}):.2f}, "
-            + f"{ds.coords[lon_label].isel({lon_label: coords[1]}):.2f})",
-        ):
+        for i, (lat, lon) in enumerate(search_co_ordinates):
             data = np.array(ds.isel({lat_label: lat, lon_label: lon})[field])
             out.append(round(main.get_periodicity(data)))
         print()
@@ -67,9 +108,11 @@ def get_periodicity(
             )
             while True:
                 try:
-                    return int(m)
+                    m = int(m)
                 except ValueError:
                     m = input(f"{m} is not a valid integer. Please input again: ")
+                else:
+                    return m
         return m
     else:
         return round(
@@ -81,28 +124,46 @@ def get_periodicity(
 # Ensembles are labeled as positive integers. Ensemble 0 is the true
 # data and ensembles 1+ are ordered from end time to start sequentially
 def get_ensembles(
-    da: xr.DataArray,
-    period: int,
-    ensemble_length: int,
-    ensemble_start: int,
-    look_back: int = 0,
-    wf: wfs.WeightingFunctionType = wfs.no_weights,
-    in_progress_bar: bool = False,
-    lon_label: Hashable = "lon",
-    lat_label: Hashable = "lat",
-    time_label: Hashable = "time",
+        da: xr.DataArray,
+        period: int,
+        ensemble_length: int,
+        initiation_index: int,
+        look_back: int = 0,
+        wf: wfs.WeightingFunctionType = wfs.no_weights,
+        lon_label: AxisLabelType = "lon",
+        lat_label: AxisLabelType = "lat",
+        time_label: AxisLabelType = "time"
 ) -> Tuple[xr.DataArray, xr.DataArray]:
+    """Get an ensemble of the data in the data array.
+
+    Given the most significant period of the data (usually annual),
+    the index of the initiation date and the length of the ensemble in
+    indices.
+
+    The lookback is the number of indices of observation data required
+
+    :param da:
+    :param period:
+    :param ensemble_length:
+    :param initiation_index:
+    :param look_back:
+    :param wf:
+    :param lon_label:
+    :param lat_label:
+    :param time_label:
+    :return:
+    """
     lat = da[lat_label].values
     lon = da[lon_label].values
     time = da[time_label].values[
-        ensemble_start - look_back: ensemble_start + ensemble_length
-    ]
+           initiation_index - look_back: initiation_index + ensemble_length
+           ]
 
     start_times = np.arange(
-        ensemble_start % period, len(da[time_label]) - ensemble_length, period
+        initiation_index % period, len(da[time_label]) - ensemble_length, period
     )
-    start_times = start_times[(start_times != ensemble_start)]
-    start_times = np.insert(start_times, 0, ensemble_start)
+    start_times = start_times[(start_times != initiation_index)]
+    start_times = np.insert(start_times, 0, initiation_index)
 
     ensemble_count = len(start_times)
     ensemble_indices = np.arange(0, ensemble_count)
@@ -122,21 +183,16 @@ def get_ensembles(
         dims=[lat_label, lon_label, "ensemble"],
         name="weights",
     )
-    for index, start_time in progress_bar(
-        start_times,
-        "Getting ensemble",
-        lambda i, imax, val: f"{da[time_label][val].values}",
-        in_progress_bar=in_progress_bar,
-    ):
+    for index, start_time in enumerate(start_times):
         ensembles[look_back:, :, :, index] = da[
             start_time: start_time + ensemble_length, :, :
         ].values
         weights[:, :, index] = wf(start_time, 1)
     ensembles[:, :, :, :] -= ensembles[look_back, :, :, :]
-    ensembles[:, :, :, :] += da[ensemble_start, :, :]
+    ensembles[:, :, :, :] += da[initiation_index, :, :]
     ensembles[:look_back, :, :, :] = da[
-        ensemble_start - look_back: ensemble_start, :, :
-    ].values[:, :, :, np.newaxis]
+                                     initiation_index - look_back: initiation_index, :, :
+                                     ].values[:, :, :, np.newaxis]
 
     return ensembles, weights
 
@@ -208,9 +264,7 @@ def plot_ensembles(
         dims=[lat_label, lon_label, "quantile"],
     )
 
-    for i, q in progress_bar(
-        quantiles, "Getting quantile", lambda i, imax, val: f"{val}"
-    ):
+    for i, q in enumerate(quantiles):
         quantile_array[:, :, i] = toqarray.quantile(q, dim="ensemble")
 
     if plot_value:
@@ -272,19 +326,12 @@ def plot_changing_lookback(
         [time_label, "ensemble", "offset"],
     )
     # plt.figure()
-    for _, i in progress_bar(offset, "Getting Offset"):
-        ensembles, weights = get_ensembles(
-            da,
-            period,
-            ensemble_length - i,
-            ensemble_start + i,
-            look_back=i,
-            in_progress_bar=True,
-            wf=wf,
-            lon_label=lon_label,
-            lat_label=lat_label,
-            time_label=time_label,
-        )
+    for i in offset:
+        ensembles, weights = get_ensembles(da, period, ensemble_length - i,
+                                           ensemble_start + i, look_back=i,
+                                           wf=wf, lon_label=lon_label,
+                                           lat_label=lat_label,
+                                           time_label=time_label)
         mean, bias, rel_bias = get_mean_data(ensembles[-1, :, :, :], weights)
 
         mean_array[:, :, i, 0] = mean.values
@@ -413,19 +460,13 @@ def plot_predictions(
     climate_mean = (
         da[end_index % period :: period, :, :].mean(time_label).values[:, :, np.newaxis]
     )
-    for i, _ in progress_bar(start_dates, "Getting ensembles", lambda _1, _2, val: val):
-        ensembles, weights = get_ensembles(
-            da,
-            period,
-            ensemble_lengths[i],
-            start_indices[i],
-            0,
-            wf(start_indices[i]),
-            True,
-            lon_label=lon_label,
-            lat_label=lat_label,
-            time_label=time_label,
-        )
+    for i, _ in enumerate(start_dates):
+        ensembles, weights = get_ensembles(da, period, ensemble_lengths[i],
+                                           start_indices[i], 0,
+                                           wf(start_indices[i]),
+                                           lon_label=lon_label,
+                                           lat_label=lat_label,
+                                           time_label=time_label)
         mean, bias, _ = get_mean_data(ensembles[-1, :, :, :], weights)
         mean_data[:, :, i] = mean.values
         bias_data[:, :, i] = bias.values
@@ -495,7 +536,6 @@ def get_hindcasts_observed(
     lat_label: Hashable = "lat",
     lon_label: Hashable = "lon",
     time_label: Hashable = "time",
-    in_progress_bar=False,
 ):
 
     mean = []
@@ -532,22 +572,12 @@ def get_hindcasts_observed(
                 [lat_label, lon_label, "hindcast"],
             )
         )
-        for j, index in progress_bar(
-            hindcast_indices,
-            f"Calculating hindcasts ({i+1}/{len(start_indices)})",
-            in_progress_bar=in_progress_bar,
-        ):
-            ensembles, weights = get_ensembles(
-                da,
-                period,
-                ensemble_lengths[i],
-                index,
-                wf=wf(index),
-                lat_label=lat_label,
-                lon_label=lon_label,
-                time_label=time_label,
-                in_progress_bar=True,
-            )
+        for j, index in enumerate(hindcast_indices):
+            ensembles, weights = get_ensembles(da, period, ensemble_lengths[i],
+                                               index, wf=wf(index),
+                                               lon_label=lon_label,
+                                               lat_label=lat_label,
+                                               time_label=time_label)
             data, _, _ = get_mean_data(ensembles[-1, :, :, :], weights)
             mean[-1][:, :, j] = data.values
             stddev[-1][:, :, j] = ensembles[-1, :, :, 1:].std(dim="ensemble")
@@ -634,7 +664,7 @@ def get_roc_auc(
     climate_mean = da[end_index % period :: period, :, :].mean(dim=time_label)
     climate_std = da[end_index % period :: period, :, :].std(dim=time_label)
     threshold = norm.ppf(threshold_value) * climate_std + climate_mean
-    for i, start_index in progress_bar(start_indices, "Calculating ROC AUC"):
+    for i, start_index in enumerate(start_indices):
         events = xr.DataArray(
             np.array(observed[i] < threshold, dtype=bool), means[i].coords
         )
@@ -845,7 +875,7 @@ def process_data(
     print(weighting_data)
 
     print(f"Period of {period} timesteps")
-
+    """
     get_weighting_roc_improvement(
         ds[field],
         "2012-07-31",
@@ -874,6 +904,7 @@ def process_data(
         ["2012-04-30", "2012-05-31", "2012-06-30", "2012-07-16", "2012-07-31"],
         period,
     )
+    """
     plot_roc_auc(
         ds[field][:, :, :],
         "2012-07-31",
@@ -893,8 +924,8 @@ def process_data(
 
 if __name__ == "__main__":
     process_data(
-        "drought-model-driving-data_pakistan_19820101-present_0.05.nc",
+        "example/data/drought-model-driving-data_pakistan_19820101-present_0.05.nc",
         6,
         "ndvi",
-        "oni.data",
+        "example/data/oni.data",
     )
