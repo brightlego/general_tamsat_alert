@@ -1,5 +1,5 @@
 import xarray as xr
-import weighting_functions as wfs
+import general_tamsat_alert.weighting_functions as wfs
 import numpy as np
 from typing import List, Tuple, Hashable
 

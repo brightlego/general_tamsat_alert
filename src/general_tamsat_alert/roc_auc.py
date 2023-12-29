@@ -5,7 +5,7 @@ from scipy.stats import norm
 import numpy as np
 
 from general_tamsat_alert.ensembles import get_ensemble_indices, get_hindcasts_observed
-import weighting_functions as wfs
+import general_tamsat_alert.weighting_functions as wfs
 
 def get_roc_auc(
     da: xr.DataArray,
