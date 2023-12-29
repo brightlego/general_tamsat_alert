@@ -1,9 +1,8 @@
 import numpy as np
 from scipy.fft import fft
 from scipy.stats import linregress, mode
-import matplotlib.pyplot as plt
 import xarray as xr
-from typing import List, Tuple, Iterable, Hashable, Sequence, Union, Dict
+from typing import List, Hashable, Dict
 from itertools import product
 
 AxisLabelType = str
@@ -22,7 +21,7 @@ def smooth(data, max_offset_proportion=0.75):
     return smoothed_data
 
 
-def get_axis_periodicity(data, debug_plots=False):
+def get_axis_periodicity(data):
     data = np.array(data)
     out = smooth(data - np.mean(data))
     result = linregress(np.arange(len(out)), out)
@@ -32,13 +31,6 @@ def get_axis_periodicity(data, debug_plots=False):
     freq = np.linspace(0, 1, len(fourier), endpoint=False)
     fourier = fourier[(freq <= 0.5)]
     freq = freq[(freq <= 0.5)]
-    if debug_plots:
-        plt.figure()
-        plt.plot(standardise(data.copy()))
-        plt.plot(standardise(out.copy()))
-        plt.figure()
-        plt.plot(freq, fourier)
-        plt.vlines(freq[np.argmax(fourier)])
     return 1 / freq[np.argmax(fourier)]
 
 
@@ -92,7 +84,6 @@ def get_periodicity(
     point: Dict[str, int] = None,
     time_label: AxisLabelType = "time",
     step: int = 10,
-    debug_plots: bool = False
 ) -> int:
     """Gets the periodicity in indices of the data in `ds[field]`.
 
@@ -131,10 +122,6 @@ def get_periodicity(
         for index in search_co_ordinates:
             data = np.array(ds.isel(index)[field])
             out.append(round(get_axis_periodicity(data)))
-        if debug_plots:
-            plt.figure()
-            plt.hist(out, bins=np.arange(min(out), max(out)), density=True)
-            plt.yscale("log")
 
         m = mode(out)[0][0]
         if m == 1:
@@ -151,4 +138,4 @@ def get_periodicity(
                     return m
         return m
     else:
-        return round(get_axis_periodicity(np.array(ds.isel(point)[field]), debug_plots=debug_plots))
+        return round(get_axis_periodicity(np.array(ds.isel(point)[field])))

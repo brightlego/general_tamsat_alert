@@ -9,7 +9,6 @@ dependencies = [
     "numpy",
     "xarray",
     "scipy",
-    "matplotlib",
     "fastroc",
 ]
 authors = [

@@ -1,13 +1,7 @@
 import xarray as xr
 import weighting_functions as wfs
 import numpy as np
-from scipy.fft import fft
-from scipy.stats import linregress, mode
-import matplotlib.pyplot as plt
-import xarray as xr
-from typing import List, Tuple, Iterable, Hashable, Sequence, Union, Dict
-from itertools import product
-
+from typing import List, Tuple, Hashable
 
 def get_ensembles(
     da: xr.DataArray,
