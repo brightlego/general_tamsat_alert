@@ -2,6 +2,7 @@ README.md
 pyproject.toml
 src/general_tamsat_alert/__init__.py
 src/general_tamsat_alert/ensembles.py
+src/general_tamsat_alert/misc.py
 src/general_tamsat_alert/periodicity.py
 src/general_tamsat_alert/roc_auc.py
 src/general_tamsat_alert/weighting_functions.py

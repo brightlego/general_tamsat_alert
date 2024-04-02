@@ -1,16 +1,19 @@
 import xarray as xr
-import general_tamsat_alert.weighting_functions as wfs
 import numpy as np
 from typing import List, Tuple, Hashable
 
+from . import weighting_functions as wfs
+
+
 def get_ensembles(
-    da: xr.DataArray,
-    period: int,
-    ensemble_length: int,
-    initiation_index: int,
-    look_back: int = 0,
-    wf: wfs.WeightingFunctionType = wfs.no_weights,
-    time_label: str = "time",
+        da: xr.DataArray,
+        period: int,
+        ensemble_length: int,
+        initiation_index: int,
+        look_back: int = 0,
+        wf: wfs.WeightingFunctionType = wfs.no_weights,
+        time_label: str = "time",
+        do_increments: int = 1
 ) -> Tuple[xr.DataArray, xr.DataArray]:
     """Get an ensemble of the data in the data array.
 
@@ -20,6 +23,9 @@ def get_ensembles(
 
     The lookback is the number of indices of observation data required
 
+    TODO: Document inputs
+
+    :param do_increments:
     :param da:
     :param period:
     :param ensemble_length:
@@ -56,11 +62,14 @@ def get_ensembles(
         ensembles[look_back:, ..., index] = da.isel(
             {time_label: slice(start_time, start_time + ensemble_length)}
         ).values
-        weights[..., index] = wf(start_time, 1)
-    ensembles[...] -= ensembles[look_back, ...]
-    ensembles[...] += da.isel({time_label: initiation_index})
-    ensembles[:look_back, ...] = da.isel(
-        {time_label: slice(initiation_index - look_back, initiation_index)}
+        weights[..., index] = wf(start_time)
+
+    if do_increments == 1:
+        ensembles[...] -= ensembles[look_back, ...]
+        ensembles[...] += da.isel({time_label: initiation_index})
+
+    ensembles[:look_back+1, ...] = da.isel(
+        {time_label: slice(initiation_index - look_back, initiation_index+1)}
     ).values[..., np.newaxis]
 
     return ensembles, weights

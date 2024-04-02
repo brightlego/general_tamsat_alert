@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: general_tamsat_alert
-Version: 0.0.4
+Version: 1.1.1
 Author-email: John Ellis <12johnellis@gmail.com>
 Classifier: Programming Language :: Python :: 3
 Requires-Python: >=3.8
@@ -9,3 +9,20 @@ Requires-Dist: numpy
 Requires-Dist: xarray
 Requires-Dist: scipy
 Requires-Dist: fastroc
+
+# General TAMSAT Alert
+
+A library to perform analysis of time series data in the way used in TAMSAT Alert.
+
+## Installation
+### From PyPI
+`pip install general-tamsat-alert`
+### From source
+```bash
+git clone https://github.com/brightlego/general_tamsat_alert.git
+cd general_tamsat_alert
+python3 -m build
+python3 -m pip install dist/*.whl
+```
+## Documentation
+[Documentation is available here](https://github.com/brightlego/general_tamsat_alert/wiki)

@@ -2,12 +2,12 @@ import numpy as np
 import xarray as xr
 from typing import Callable, Union, Sequence, Tuple, Optional
 
-WeightingFunctionType = Union[Callable[[int, float], Union[float, np.ndarray, xr.DataArray]]]
+WeightingFunctionType = Callable[[int], Union[float, np.ndarray, xr.DataArray]]
 WeightingFunctionIntermediateType = Callable[[int], WeightingFunctionType]
 WeightingFunctionBuilderType = Callable[..., WeightingFunctionIntermediateType]
 
 
-def no_weights(member_index: int, weighting_strength: float = 1.0) -> float:
+def no_weights(member_index: int) -> float:
     return 1.0
 
 
@@ -15,13 +15,13 @@ def no_weights_intermediate(initiation_index: int) -> WeightingFunctionType:
     return no_weights
 
 
-def no_weights_builder() -> WeightingFunctionIntermediateType:
+def no_weights_builder(weighting_strength: float = 1.0) -> WeightingFunctionIntermediateType:
     return no_weights_intermediate
 
 
-def weight_time_builder(period: int = 24) -> WeightingFunctionIntermediateType:
+def weight_time_builder(period: int = 24, weighting_strength: float = 1.0) -> WeightingFunctionIntermediateType:
     def weight_time_intermediate(initiation_index: int) -> WeightingFunctionType:
-        def weight_time(member_index: int, weighting_strength: float = 1.0) -> float:
+        def weight_time(member_index: int) -> float:
             if member_index == initiation_index:
                 return 0.0
             else:
@@ -33,7 +33,8 @@ def weight_time_builder(period: int = 24) -> WeightingFunctionIntermediateType:
 def weight_neighbour_error_builder(data: xr.DataArray,
                                    neighbour_shifts: Sequence[Tuple[int, int]] = ((1, 0), (0, 1), (-1, 0), (0, -1)),
                                    neighbour_weights: Optional[Sequence[Tuple[int, int]]] = None,
-                                   lat_label: str = "lat", lon_label: str = "lon") -> WeightingFunctionIntermediateType:
+                                   lat_label: str = "lat", lon_label: str = "lon",
+                                   weighting_strength: float = 1.0) -> WeightingFunctionIntermediateType:
     def weight_neighbor_error_intermediate(initiation_index: int) -> WeightingFunctionType:
         if neighbour_weights is None:
             internal_neighbour_weights = [1 / np.sqrt(x * x + y * y) for y,x in neighbour_shifts]
@@ -53,7 +54,7 @@ def weight_neighbour_error_builder(data: xr.DataArray,
         for (y, x) in neighbour_shifts:
             shifted_data.append(data[initiation_index, :, :].shift(lat=y, lon=x).values)
 
-        def weight_neighbour_error(member_index: int, weighting_strength: float = 1.0) -> np.ndarray:
+        def weight_neighbour_error(member_index: int) -> np.ndarray:
             if member_index == initiation_index:
                 return np.zeros((len(lat), len(lon)))
 
@@ -69,9 +70,9 @@ def weight_neighbour_error_builder(data: xr.DataArray,
     return weight_neighbor_error_intermediate
 
 
-def weight_value_builder(values: Sequence[float]) -> WeightingFunctionIntermediateType:
+def weight_value_builder(values: Sequence[float], weighting_strength: float = 1.0) -> WeightingFunctionIntermediateType:
     def weight_value_intermediate(initiation_index: int) -> WeightingFunctionType:
-        def weight_value(member_index: int, weighting_strength: float=1) -> float:
+        def weight_value(member_index: int) -> float:
             delta = values[member_index] - values[initiation_index]
             delta = np.abs(delta)
             return np.exp(-(weighting_strength*delta)**2)
