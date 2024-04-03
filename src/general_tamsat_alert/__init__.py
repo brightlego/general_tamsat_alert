@@ -57,6 +57,10 @@ def do_forecast(
     
     Example function call:
     ---------------------
+    import datetime as dtmod
+    from general_tamsat_alert import do_forecast
+    
+    
     field_name='precip'
     time_label='time'
     datafile='pr_gpcc_africa.nc'
