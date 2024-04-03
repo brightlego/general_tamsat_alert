@@ -26,6 +26,36 @@ def do_forecast(
     weighting_strength=1,
     do_increments=1,
 ):
+
+    '''
+    Function that ingests time series data and produces ensemble forecasts using the TAMSAT-ALERT method
+    
+    Input parameters
+    ----------------
+    :param datafile: netcdf file containing the time series data on which to base the forecasts. The datafile must include a time axis, but the format is otherwise flexible
+    :param field_name: name of the variable to be forecast
+    :param init_date: initiation date of the forecast (datetime object)
+    :param poi_start: date of the start of the period of interest (datetime object)
+    :param poi_end: date of the end of the period of interest (datetime object)
+    :param time_label [default 'time']: time axis label in the netcdf file
+    :param period [default 12]: period of the data to be used for deriving the climatology
+    :param weights_flag [default 0]: type of ensemble weighting to be used:
+        0: No weighting
+        1: Weighting using the proximity of the ensemble member year to the initiation date
+        2: Weighting using a monthly data included in weighting_data_file
+    :param weighting_data_file [default 'None']: text file containing the data to be used for weighting. The data are in the format used for the NOAA composite and correlation site (format described here: https://psl.noaa.gov/data/composites/createtime.html)
+    :param weighting_strength [default 1]: coefficient specifying the strength of the weighting used when weights_flag is set to 1 or 2. 0 indicates no weighting; floats >0 indicates weighting is applied. Users should experiment to find the most appropriate weighting strength
+    :param do_increments [default 1]: flag specifying whether or not the ensemble members should be incremented from the initial state. Set do_increments to 0 for no incrementing; 1 for incrementing
+    
+    Returns
+    -------
+    xarray dataset on the same grid and using the same dimensions as datafile, with an additional dimension 'ensemble' specifying the ensemble number. The dataset includes the following variables:
+    ensemble_out: array containing the full forecast ensemble (dimensions <datafile geographical dimensions>, <datafile time dimension>, ensemble)
+    weights: array containing the the weights applied to each ensemble member at each point in space (dimensions <datafile geographical dimensions>, ensemble). Note that in the current version of the code, weights is constant over the geographical domain
+    ens_mean: weighted ensemble mean (dimensions <datafile geographic dimensions>)
+    ens_std: weighted ensemble standard deviation (dimensions <datafile geographic dimensions>)
+    
+    '''
     ds = xr.open_dataset(datafile)
     da = ds[field_name]
 
@@ -46,7 +76,6 @@ def do_forecast(
     poi_start_index = get_index(da, time_label, poi_start)
     poi_end_index = get_index(da, time_label, poi_end)
 
-    print(init_index, poi_start_index, poi_end_index)
 
     # Calculate inputs for get_ensembles
     ensemble_start = init_index
@@ -58,7 +87,6 @@ def do_forecast(
     else:
         look_back = 0
 
-    print(ensemble_start, ensemble_length, look_back)
 
     # check what happens if poi_end_index = init_index
     if poi_end_index < init_index:
