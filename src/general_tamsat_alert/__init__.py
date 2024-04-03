@@ -55,6 +55,26 @@ def do_forecast(
     ens_mean: weighted ensemble mean (dimensions <datafile geographic dimensions>)
     ens_std: weighted ensemble standard deviation (dimensions <datafile geographic dimensions>)
     
+    Example function call:
+    ---------------------
+    field_name='precip'
+    time_label='time'
+    datafile='pr_gpcc_africa.nc'
+    init_date=dtmod.datetime(1997,9,1)
+    poi_start=dtmod.datetime(1997,10,1)
+    poi_end=dtmod.datetime(1997,10,1)
+    period=12
+    weights_flag=2
+    weighting_data_file='oni.data'
+    do_increments=0
+    weighting_strength=1
+
+    tmpout=do_forecast(datafile,field_name,init_date,poi_start,poi_end,
+                    time_label,period,weights_flag,weighting_data_file,
+                    weighting_strength)
+    
+    The example function call uses regridded and subset GPCC precipiation data, and the Oceanic Nino Index provided by NOAA. Convenience copies of these datasets can be found in https://gws-access.jasmin.ac.uk/public/tamsat/tamsat_alert/example_data/
+    
     '''
     ds = xr.open_dataset(datafile)
     da = ds[field_name]
