@@ -100,7 +100,6 @@ def get_periodicity(
     :param point: (Optional) The point to use if you are impatient
     :param time_label: The label for the time axis
     :param step: The lon/lat step to use in sampling
-    :param debug_plots: Whether to plot debug plots
     :return: The periodicity in indices
     """
     if point is None:
