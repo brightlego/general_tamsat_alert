@@ -54,6 +54,7 @@ def do_forecast(
     weights: array containing the the weights applied to each ensemble member at each point in space (dimensions <datafile geographical dimensions>, ensemble). Note that in the current version of the code, weights is constant over the geographical domain
     ens_mean: weighted ensemble mean (dimensions <datafile geographic dimensions>)
     ens_std: weighted ensemble standard deviation (dimensions <datafile geographic dimensions>)
+    clim: climatology of the data in datafile (based on the user specified periodicity)
     
     Example function call:
     ---------------------
@@ -75,7 +76,7 @@ def do_forecast(
 
     tmpout=do_forecast(datafile,field_name,init_date,poi_start,poi_end,
                     time_label,period,weights_flag,weighting_data_file,
-                    weighting_strength)
+                    weighting_strength, do_increments)
     
     The example function call uses regridded and subset GPCC precipiation data, and the Oceanic Nino Index provided by NOAA. Convenience copies of these datasets can be found in https://gws-access.jasmin.ac.uk/public/tamsat/tamsat_alert/example_data/
     
