@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: general_tamsat_alert
-Version: 1.1.1
+Version: 1.1.2a3
 Author-email: John Ellis <12johnellis@gmail.com>
 Classifier: Programming Language :: Python :: 3
 Requires-Python: >=3.8

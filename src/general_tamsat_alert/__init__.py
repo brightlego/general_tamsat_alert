@@ -146,4 +146,20 @@ def do_forecast(
     tmpout_xr["ens_mean"] = (dims[:-1], ens_mean)
     tmpout_xr["ens_std"] = (dims[:-1], ens_stddev)
     tmpout_xr["weights"] = (dims, weights.values)
+    tmpout_xr["clim"] = (["time_clim"] + dims[:-1], get_climatology(datafile, period, field_name))
     return tmpout_xr
+
+
+def get_climatology(datafile: str, period: int, field_name: str):
+    datain = xr.open_dataset(datafile)[field_name].values
+    datain = datain[0:period*(datain.shape[0]//period), ...]
+
+    newshape = ((datain.shape[0]//period, period), datain.shape[1:])
+
+    # https://stackoverflow.com/questions/3204245/how-do-i-convert-a-tuple-of-tuples-to-a-one-dimensional-list-using-list-comprehe
+    newshape = [element for tupl in newshape for element in tupl]
+
+    datain = np.reshape(datain, newshape=newshape)
+    clim = np.nanmean(datain, axis=0)
+
+    return clim

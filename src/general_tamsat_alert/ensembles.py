@@ -71,7 +71,7 @@ def get_ensembles(
     ensembles[:look_back+1, ...] = da.isel(
         {time_label: slice(initiation_index - look_back, initiation_index+1)}
     ).values[..., np.newaxis]
-
+    weights.values[np.isnan(weights.values)] = 0
     return ensembles, weights
 
 
