@@ -1,4 +1,4 @@
-# General TAMSAT Alert
+# General TAMSAT Alert (v1.2.1 10.5281/zenodo.10955390)
 
 A library to perform analysis of time series data in the way used in TAMSAT Alert.
 
