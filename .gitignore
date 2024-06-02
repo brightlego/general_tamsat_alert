@@ -1,3 +1,5 @@
 **/.*
 **/*.nc
 !**/.gitignore
+**/*.egg-info
+dist/*

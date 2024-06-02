@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: general_tamsat_alert
-Version: 1.2.0
+Version: 1.2.2
 Author-email: John Ellis <12johnellis@gmail.com>
 Classifier: Programming Language :: Python :: 3
 Requires-Python: >=3.8
@@ -10,7 +10,8 @@ Requires-Dist: xarray
 Requires-Dist: scipy
 Requires-Dist: fastroc
 
-# General TAMSAT Alert
+# General TAMSAT Alert 
+## v1.2.1  DOI: 10.5281/zenodo.10955490
 
 A library to perform analysis of time series data in the way used in TAMSAT Alert.
 

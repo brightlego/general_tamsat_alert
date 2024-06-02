@@ -1,5 +1,6 @@
 import numpy as np
 import xarray as xr
+import datetime
 
 from .periodicity import get_periodicity
 from . import weighting_functions as wfs
@@ -10,6 +11,24 @@ from . import misc
 def get_index(da, axis_label, value):
     indices = np.arange(len(da[axis_label]), dtype=np.int64)
     nearest_value = da[axis_label].sel({axis_label: value}, method="nearest")
+
+    # Assume the values on the time axis label are increasing
+    max_value = da[axis_label].values[-1]
+    min_value = da[axis_label].values[0]
+    if value > max_value:
+        delta = value - max_value
+        max_index = get_index(da, axis_label, max_value)
+        if max_value - delta >= min_value:
+            opposite = get_index(da, axis_label, max_value - delta)
+            return (max_index - opposite) + max_index
+        else:
+            try:
+                max_delta = max_value - da[axis_label].values.min()
+                max_index_delta = da[axis_label].values.shape[0]
+                return round(max_index_delta * delta / max_delta + max_index)
+            except TypeError:
+                raise TypeError("Unable to extrapolate time index from non-numeric data")
+
     return indices[da[axis_label].isin(nearest_value)][0]
 
 
@@ -25,6 +44,7 @@ def do_forecast(
     weighting_data_file=None,
     weighting_strength=1,
     do_increments=1,
+    suppress_datetime_conversion=False
 ):
 
     '''
@@ -32,29 +52,41 @@ def do_forecast(
     
     Input parameters
     ----------------
-    :param datafile: netcdf file containing the time series data on which to base the forecasts. The datafile must include a time axis, but the format is otherwise flexible
+    :param datafile: netcdf file containing the time series data on which to base the forecasts. The datafile must
+                     include a time axis, but the format is otherwise flexible
     :param field_name: name of the variable to be forecast
     :param init_date: initiation date of the forecast (datetime object)
     :param poi_start: date of the start of the period of interest (datetime object)
     :param poi_end: date of the end of the period of interest (datetime object)
-    :param time_label [default 'time']: time axis label in the netcdf file
-    :param period [default 12]: period of the data to be used for deriving the climatology
-    :param weights_flag [default 0]: type of ensemble weighting to be used:
+    :param time_label: [default 'time'] time axis label in the netcdf file
+    :param period: [default 12] period of the data to be used for deriving the climatology
+    :param weights_flag: [default 0] type of ensemble weighting to be used:
         0: No weighting
         1: Weighting using the proximity of the ensemble member year to the initiation date
         2: Weighting using a monthly data included in weighting_data_file
-    :param weighting_data_file [default 'None']: text file containing the data to be used for weighting. The data are in the format used for the NOAA composite and correlation site (format described here: https://psl.noaa.gov/data/composites/createtime.html)
-    :param weighting_strength [default 1]: coefficient specifying the strength of the weighting used when weights_flag is set to 1 or 2. 0 indicates no weighting; floats >0 indicates weighting is applied. Users should experiment to find the most appropriate weighting strength
-    :param do_increments [default 1]: flag specifying whether or not the ensemble members should be incremented from the initial state. Set do_increments to 0 for no incrementing; 1 for incrementing
-    
+    :param weighting_data_file: [default 'None'] text file containing the data to be used for weighting. The data are
+                                in the format used for the NOAA composite and correlation site (format described here:
+                                https://psl.noaa.gov/data/composites/createtime.html)
+    :param weighting_strength: [default 1] coefficient specifying the strength of the weighting used when weights_flag
+                                is set to 1 or 2. 0 indicates no weighting; floats >0 indicates weighting is applied.
+                                Users should experiment to find the most appropriate weighting strength
+    :param do_increments: [default 1] flag specifying whether or not the ensemble members should be incremented from
+                                the initial state. Set do_increments to 0 for no incrementing; 1 for incrementing
+    :param suppress_datetime_conversion: [default False] whether to suppress the conversion of datetime.datetimes to
+                                np.datetime64 for poi_start, poi_end, time_label
+
     Returns
     -------
-    xarray dataset on the same grid and using the same dimensions as datafile, with an additional dimension 'ensemble' specifying the ensemble number. The dataset includes the following variables:
-    ensemble_out: array containing the full forecast ensemble (dimensions <datafile geographical dimensions>, <datafile time dimension>, ensemble)
-    weights: array containing the the weights applied to each ensemble member at each point in space (dimensions <datafile geographical dimensions>, ensemble). Note that in the current version of the code, weights is constant over the geographical domain
-    ens_mean: weighted ensemble mean (dimensions <datafile geographic dimensions>)
-    ens_std: weighted ensemble standard deviation (dimensions <datafile geographic dimensions>)
-    clim: climatology of the data in datafile (based on the user specified periodicity)
+    xarray dataset on the same grid and using the same dimensions as datafile, with an additional dimension 'ensemble'
+    specifying the ensemble number. The dataset includes the following variables:
+        ensemble_out: array containing the full forecast ensemble (dimensions <datafile geographical dimensions>,
+                      <datafile time dimension>, ensemble)
+        weights: array containing the the weights applied to each ensemble member at each point in space (dimensions
+                 <datafile geographical dimensions>, ensemble). Note that in the current version of the code,
+                 weights is constant over the geographical domain
+        ens_mean: weighted ensemble mean (dimensions <datafile geographic dimensions>)
+        ens_std: weighted ensemble standard deviation (dimensions <datafile geographic dimensions>)
+        clim: climatology of the data in datafile (based on the user specified periodicity)
     
     Example function call:
     ---------------------
@@ -96,6 +128,16 @@ def do_forecast(
         1: wfs.weight_time_builder(period, weighting_strength),
         2: wfs.weight_value_builder(weighting_data, weighting_strength),
     }
+
+    if not suppress_datetime_conversion:
+        if isinstance(init_date, datetime.datetime):
+            init_date = np.datetime64(init_date)
+
+        if isinstance(poi_start, datetime.datetime):
+            poi_start = np.datetime64(poi_start)
+
+        if isinstance(poi_end, datetime.datetime):
+            poi_end = np.datetime64(poi_end)
 
     init_index = get_index(da, time_label, init_date)
     poi_start_index = get_index(da, time_label, poi_start)

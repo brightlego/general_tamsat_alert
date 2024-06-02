@@ -2,6 +2,16 @@ import xarray as xr
 import numpy as np
 
 
+def extrapolate_time_label(time_axis: xr.DataArray, initiation_index: int, start_index: int, end_index: int, period: int) -> xr.DataArray:
+    adjusted_start = start_index % period
+    offset = start_index - adjusted_start
+    adjusted_end = end_index - offset
+    adjusted_initiation = initiation_index - offset
+
+    delta = time_axis.values[initiation_index] - time_axis.values[adjusted_initiation]
+    return time_axis[adjusted_start : adjusted_end] + delta
+
+
 def read_noaa_data_file(
     fname: str,
     time_axis: xr.DataArray = None,

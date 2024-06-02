@@ -1,8 +1,10 @@
 import xarray as xr
 import numpy as np
+
 from typing import List, Tuple, Hashable
 
 from . import weighting_functions as wfs
+from . import misc
 
 
 def get_ensembles(
@@ -35,18 +37,32 @@ def get_ensembles(
     :param time_label:
     :return:
     """
-    time = da[time_label].values[
-        initiation_index - look_back : initiation_index + ensemble_length
-    ]
+
+    invalid_init_date = False
+
+    if initiation_index + ensemble_length >= da[time_label].values.shape[0]:
+        invalid_init_date = True
+        try:
+            time = misc.extrapolate_time_label(da[time_label], initiation_index, initiation_index - look_back, initiation_index + ensemble_length, period)
+        except TypeError:
+            time = np.arange(initiation_index - look_back, initiation_index + ensemble_length)
+    else:
+        time = da[time_label].values[
+            initiation_index - look_back : initiation_index + ensemble_length
+        ]
 
     start_times = np.arange(
         initiation_index % period, len(da[time_label]) - ensemble_length, period
     )
     start_times = start_times[(start_times != initiation_index)]
-    start_times = np.insert(start_times, 0, initiation_index)
+    if not invalid_init_date:
+        start_times = np.insert(start_times, 0, initiation_index)
 
     ensemble_count = len(start_times)
-    ensemble_indices = np.arange(0, ensemble_count)
+    if not invalid_init_date:
+        ensemble_indices = np.arange(0, ensemble_count)
+    else:
+        ensemble_indices = np.arange(1, ensemble_count+1)
 
     coords = [da[i].values for i in da.dims if i != time_label] + [ensemble_indices]
     dims = [i for i in da.dims if i != time_label] + ["ensemble"]
