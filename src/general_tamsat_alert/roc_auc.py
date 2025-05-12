@@ -1,5 +1,10 @@
 import xarray as xr
-import fastroc
+try:
+    import fastroc
+    has_fastroc = True
+except ModuleNotFoundError:
+    has_fastroc = False
+
 from typing import List
 from scipy.stats import norm
 import numpy as np
@@ -17,6 +22,8 @@ def get_roc_auc(
     integration_steps=50,
     time_label: str = "time",
 ):
+    if not has_fastroc:
+        raise ModuleNotFoundError("Attempting to run get_roc_auc without fastroc installed")
     start_indices, ensemble_lengths, end_index = get_ensemble_indices(
         da, prediction_date, start_dates, time_label=time_label
     )

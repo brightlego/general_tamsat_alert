@@ -1,4 +1,6 @@
 numpy
 xarray
 scipy
+
+[fastroc]
 fastroc
