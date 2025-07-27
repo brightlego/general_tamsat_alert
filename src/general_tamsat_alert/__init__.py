@@ -44,7 +44,9 @@ def do_forecast(
     weighting_data_file=None,
     weighting_strength=1,
     do_increments=1,
-    suppress_datetime_conversion=False
+    suppress_datetime_conversion=False,
+    poi_endpoint_inclusive=True,
+    time_nearest_neighbour=True,
 ):
 
     '''
@@ -52,8 +54,8 @@ def do_forecast(
     
     Input parameters
     ----------------
-    :param datafile: netcdf file containing the time series data on which to base the forecasts. The datafile must
-                     include a time axis, but the format is otherwise flexible
+    :param datafile: netcdf file or file-like object containing the time series data on which to base the forecasts.
+                     The datafile must include a time axis, but the format is otherwise flexible
     :param field_name: name of the variable to be forecast
     :param init_date: initiation date of the forecast (datetime object)
     :param poi_start: date of the start of the period of interest (datetime object)
@@ -74,7 +76,14 @@ def do_forecast(
                                 the initial state. Set do_increments to 0 for no incrementing; 1 for incrementing
     :param suppress_datetime_conversion: [default False] whether to suppress the conversion of datetime.datetimes to
                                 np.datetime64 for poi_start, poi_end, time_label
-
+    :param poi_endpoint_inclusive: [default True] whether to include the end point of the POI in the ensemble
+    :param time_nearest_neighbour: [default True] whether to take the nearest neighbour for the endpoints when slicing
+                                along the time axis (e.g. if the data has values for 2020-06-30, 2020-07-15 and
+                                2020-07-31 attempting to slice 2020-07-01 - 2020-07-31 would give all 3 datapoints) or
+                                to require that the time value for the datapoints are strictly within any specified
+                                range. If poi_endpoint_inclusive is True then it will not truncate twice (e.g.
+                                2020-07-01 - 2020-08-01 will give all 3 datapoints but 2020-07-01 - 2020-07-31 will
+                                only give 2).
     Returns
     -------
     xarray dataset on the same grid and using the same dimensions as datafile, with an additional dimension 'ensemble'
@@ -143,11 +152,26 @@ def do_forecast(
     poi_start_index = get_index(da, time_label, poi_start)
     poi_end_index = get_index(da, time_label, poi_end)
 
+    truncated_end = False
+
+    if not time_nearest_neighbour:
+        if da[time_label][init_index] < init_date:
+            init_index += 1
+
+        if da[time_label][poi_start_index] < poi_start:
+            poi_start_index += 1
+
+        if da[time_label][poi_end_index] > poi_end:
+            poi_end_index -= 1
+            truncated_end = True
+
+    if poi_endpoint_inclusive or truncated_end:
+        ensemble_length = poi_end_index - init_index + 1
+    else:
+        ensemble_length = poi_end_index - init_index
 
     # Calculate inputs for get_ensembles
     ensemble_start = init_index
-
-    ensemble_length = poi_end_index - init_index + 1
 
     if poi_start_index < init_index:
         look_back = init_index - poi_start_index
