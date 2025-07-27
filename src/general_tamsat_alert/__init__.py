@@ -175,7 +175,8 @@ def do_forecast(
 
     tmpout_xr = ensemble_out.to_dataset()
     poi_mean = ensemble_out[poi_offset:, ..., 1:].mean(dim=time_label)
-    ens_mean = np.average(poi_mean.values, weights=weights.values[..., 1:], axis=-1)
+    nanless_poi_mean = np.ma.masked_array(poi_mean.values, np.isnan(poi_mean.values))
+    ens_mean = np.ma.average(nanless_poi_mean, weights=weights.values[..., 1:], axis=-1)
     ens_stddev = np.sqrt(
         np.average(
             (poi_mean.values - ens_mean[..., np.newaxis]) ** 2,
