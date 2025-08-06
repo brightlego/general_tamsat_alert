@@ -1,3 +1,5 @@
+import os.path
+
 import numpy as np
 import xarray as xr
 import datetime
@@ -66,8 +68,11 @@ def do_forecast(
         0: No weighting
         1: Weighting using the proximity of the ensemble member year to the initiation date
         2: Weighting using a monthly data included in weighting_data_file
-    :param weighting_data_file: [default 'None'] text file containing the data to be used for weighting. The data are
-                                in the format used for the NOAA composite and correlation site (format described here:
+        3: Weighting using annual data on a grid, taking "ens_year" as the year axis.
+    :param weighting_data_file: [default 'None'] xarray DataArry, NetCDF or text file containing the data to be used
+                                for weighting. If it is a NetCDF with one varialbe, it is converted into a xarray
+                                DataArray. If it is a text file, the data is in the format used for the NOAA
+                                composite and correlation site (format described here:
                                 https://psl.noaa.gov/data/composites/createtime.html)
     :param weighting_strength: [default 1] coefficient specifying the strength of the weighting used when weights_flag
                                 is set to 1 or 2. 0 indicates no weighting; floats >0 indicates weighting is applied.
@@ -119,23 +124,30 @@ def do_forecast(
                     time_label,period,weights_flag,weighting_data_file,
                     weighting_strength, do_increments)
     
-    The example function call uses regridded and subset GPCC precipiation data, and the Oceanic Nino Index provided by NOAA. Convenience copies of these datasets can be found in https://gws-access.jasmin.ac.uk/public/tamsat/tamsat_alert/example_data/
+    The example function call uses regridded and subset GPCC precipiation data, and the Oceanic Nino Index provided by
+    NOAA. Convenience copies of these datasets can be found in
+    https://gws-access.jasmin.ac.uk/public/tamsat/tamsat_alert/example_data/
     
     '''
     ds = xr.open_dataset(datafile)
     da = ds[field_name]
 
-    if weighting_data_file is not None:
-        weighting_data = misc.read_noaa_data_file(
-            weighting_data_file, da[time_label], time_label
-        )
-    else:
+    if isinstance(weighting_data_file, xr.DataArray):
+        weighting_data = weighting_data_file
+    elif weighting_data_file is None:
         weighting_data = np.ones(len(da[time_label]))
+    elif not isinstance(weighting_data_file, str) or os.path.splitext(weighting_data_file)[1] == ".nc":
+        weighting_data = xr.load_dataset(weighting_data_file)
+        if len(weighting_data.data_vars) == 1:
+            weighting_data = weighting_data[list(weighting_data.data_vars)[0]]
+    else:
+        weighting_data = misc.read_noaa_data_file(weighting_data_file, da[time_label], time_label)
 
     weighting_functions = {
         0: wfs.no_weights_builder(),
         1: wfs.weight_time_builder(period, weighting_strength),
         2: wfs.weight_value_builder(weighting_data, weighting_strength),
+        3: wfs.weight_data_on_axis_builder(weighting_data, ds, weight_axis="ens_year", value_time_axis=time_label, axis_function=get_year)
     }
 
     if not suppress_datetime_conversion:
@@ -202,7 +214,7 @@ def do_forecast(
     nanless_poi_mean = np.ma.masked_array(poi_mean.values, np.isnan(poi_mean.values))
     ens_mean = np.ma.average(nanless_poi_mean, weights=weights.values[..., 1:], axis=-1)
     ens_stddev = np.sqrt(
-        np.average(
+        np.ma.average(
             (poi_mean.values - ens_mean[..., np.newaxis]) ** 2,
             weights=weights.values[..., 1:],
             axis=-1,
@@ -216,6 +228,10 @@ def do_forecast(
     tmpout_xr["weights"] = (dims, weights.values)
     tmpout_xr["clim"] = (["time_clim"] + dims[:-1], get_climatology(datafile, period, field_name))
     return tmpout_xr
+
+def get_year(t: np.datetime64) -> int:
+    # Dates should always include the year
+    return int(str(t).split('-')[0])
 
 
 def get_climatology(datafile: str, period: int, field_name: str):

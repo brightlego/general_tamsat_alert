@@ -1,7 +1,10 @@
+import logging
+
 import xarray as xr
 import numpy as np
+import logging
 
-from typing import List, Tuple, Hashable
+from typing import List, Tuple, Hashable, Optional
 
 from . import weighting_functions as wfs
 from . import misc
@@ -15,7 +18,8 @@ def get_ensembles(
         look_back: int = 0,
         wf: wfs.WeightingFunctionType = wfs.no_weights,
         time_label: str = "time",
-        do_increments: int = 1
+        do_increments: int = 1,
+        logger: Optional[logging.Logger] = None
 ) -> Tuple[xr.DataArray, xr.DataArray]:
     """Get an ensemble of the data in the data array.
 
@@ -35,8 +39,13 @@ def get_ensembles(
     :param look_back:
     :param wf:
     :param time_label:
+    :param logger:
     :return:
     """
+
+    if logger is None:
+        logger = logging.getLogger(__name__)
+
 
     invalid_init_date = False
 
@@ -78,7 +87,7 @@ def get_ensembles(
         ensembles[look_back:, ..., index] = da.isel(
             {time_label: slice(start_time, start_time + ensemble_length)}
         ).values
-        weights[..., index] = wf(start_time)
+        weights[..., index] = wf(start_time, logger)
 
     if do_increments == 1:
         ensembles[...] -= ensembles[look_back, ...]

@@ -12,6 +12,7 @@ src/general_tamsat_alert.egg-info/dependency_links.txt
 src/general_tamsat_alert.egg-info/requires.txt
 src/general_tamsat_alert.egg-info/top_level.txt
 tests/test_do_forecast.py
+tests/test_endpoints.py
 tests/test_ensembels_being_zero.py
 tests/test_ensembles.py
 tests/test_periodicity.py
