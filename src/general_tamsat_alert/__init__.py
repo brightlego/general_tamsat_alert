@@ -68,7 +68,8 @@ def do_forecast(
         0: No weighting
         1: Weighting using the proximity of the ensemble member year to the initiation date
         2: Weighting using a monthly data included in weighting_data_file
-        3: Weighting using annual data on a grid, taking "ens_year" as the year axis.
+        3: Weighting using annual data on a grid, taking "ens_year" as the year axis. The weighted dimensions must be
+           a subset of the datafile's dimensions.
     :param weighting_data_file: [default 'None'] xarray DataArry, NetCDF or text file containing the data to be used
                                 for weighting. If it is a NetCDF with one varialbe, it is converted into a xarray
                                 DataArray. If it is a text file, the data is in the format used for the NOAA

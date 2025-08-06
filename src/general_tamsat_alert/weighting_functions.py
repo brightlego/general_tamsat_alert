@@ -110,6 +110,7 @@ def weight_data_on_axis_builder(weight_data: xr.DataArray,
                     logger.warning(f"Unable to find weighting data over {dim}")
 
             weights = weights.interp_like(value_data.isel({value_time_axis: member_index}), kwargs={"fill_value": 0})
+            weights = weights.transpose(*[i for i in value_data.dims if i in weights.dims])
             return weights
 
         return weight_data_on_axis
